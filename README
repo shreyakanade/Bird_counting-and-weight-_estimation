@@ -1,0 +1,15 @@
+# Poultry Monitoring Prototype
+
+## Setup
+
+1. Install requirements: `pip install -r requirements.txt`
+2. Run server: `python main.py`
+
+## Counting & Weight Method
+
+- **Counting:** YOLOv8 detects birds; ByteTrack assigns persistent IDs and handles occlusions via Kalman filtering.
+- **Weight:** Calculated as 'Projected Dorsal Area' (Pixel Area). Grams require a reference object calibration (e.g., $Weight = Area * k$).
+
+## API Usage
+
+`POST /analyze_video` with a video file.

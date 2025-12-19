@@ -1,0 +1,25 @@
+{
+  "job_id": "82a1bc",
+  "counts": [
+    {"timestamp": 0.0, "count": 15},
+    {"timestamp": 0.5, "count": 15},
+    {"timestamp": 1.0, "count": 16},
+    {"timestamp": 1.5, "count": 14}
+  ],
+  "tracks_sample": [
+    {
+      "id": 7,
+      "box": [450.2, 310.5, 520.0, 415.0],
+      "weight_index": 7315.0,
+      "confidence": 0.89
+    }
+  ],
+  "weight_estimates": {
+    "unit": "relative_pixel_index",
+    "avg_index": 7450.2,
+    "calibration_required": "Grams = Index * k"
+  },
+  "artifacts": {
+    "annotated_video": "outputs/result_82a1bc.mp4"
+  }
+}
