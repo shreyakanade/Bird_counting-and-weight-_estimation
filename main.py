@@ -1,75 +1,81 @@
-import cv2
+from fastapi import FastAPI, UploadFile, File
+import shutil
 import os
+import cv2
 import uuid
-from fastapi import FastAPI, UploadFile, File, Query
-from processor import PoultryProcessor
+
+from app.detector import BirdDetector
+from app.tracker import Tracker
+from app.weight import WeightEstimator
+from app.utils import sample_frames, draw_overlay
 
 app = FastAPI()
-proc = PoultryProcessor()
+
+OUTPUT_DIR = "outputs"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 
 @app.get("/health")
 def health():
     return {"status": "OK"}
 
+
 @app.post("/analyze_video")
-async def analyze_video(
-    file: UploadFile = File(...),
+def analyze_video(
+    video: UploadFile = File(...),
     fps_sample: int = 5,
-    conf_thresh: float = 0.25
+    conf_thresh: float = 0.4,
+    iou_thresh: float = 0.3
 ):
-    job_id = str(uuid.uuid4())[:8]
-    input_path = f"temp_{job_id}_{file.filename}"
-    output_filename = f"result_{job_id}.mp4"
-    output_path = os.path.join("outputs", output_filename)
-    
-    if not os.path.exists("outputs"): os.makedirs("outputs")
+    video_id = str(uuid.uuid4())
+    video_path = f"{OUTPUT_DIR}/{video_id}.mp4"
 
-    with open(input_path, "wb") as buffer:
-        buffer.write(await file.read())
+    with open(video_path, "wb") as f:
+        shutil.copyfileobj(video.file, f)
 
-    cap = cv2.VideoCapture(input_path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
+    frames, timestamps, fps = sample_frames(video_path, fps_sample)
 
-    time_series = []
-    tracks_sample = []
-    frame_count = 0
+    detector = BirdDetector(conf_thresh)
+    tracker = Tracker(iou_thresh)
+    weight_estimator = WeightEstimator()
 
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret: break
+    counts = []
+    annotated_frames = []
 
-        # Sample at specified FPS
-        if frame_count % max(1, int(fps // fps_sample)) == 0:
-            annotated_frame, detections = proc.process_frame(frame, conf_thresh)
-            
-            count = len(detections)
-            timestamp = frame_count / fps
-            
-            time_series.append({"timestamp": round(timestamp, 2), "count": count})
-            if detections and len(tracks_sample) < 5:
-                tracks_sample.append(detections[0])
-            
-            out.write(annotated_frame)
-        else:
-            out.write(frame)
-        
-        frame_count += 1
+    for frame, ts in zip(frames, timestamps):
+        detections = detector.detect(frame)
+        tracks = tracker.update(detections)
+        weight_estimator.update(tracks)
 
-    cap.release()
+        counts.append({
+            "timestamp": round(ts, 2),
+            "count": len(tracks)
+        })
+
+        frame = draw_overlay(frame, tracks, len(tracks))
+        annotated_frames.append(frame)
+
+    # Save annotated video
+    h, w, _ = annotated_frames[0].shape
+    out_path = f"{OUTPUT_DIR}/annotated_{video_id}.mp4"
+    out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps_sample, (w, h)) # type: ignore
+
+    for f in annotated_frames:
+        out.write(f)
     out.release()
-    os.remove(input_path)
 
-    return {
-        "counts": time_series,
-        "tracks_sample": tracks_sample,
-        "weight_estimates": {"unit": "pixel_area_index", "status": "Relative"},
-        "artifacts": {"video_url": output_path}
+    weight_estimates = weight_estimator.estimate()
+
+    response = {
+        "counts": counts,
+        "tracks_sample": list(weight_estimates.keys())[:5],
+        "weight_estimates": {
+            "unit": "relative_index",
+            "per_bird": weight_estimates
+        },
+        "artifacts": {
+            "annotated_video": out_path
+        }
     }
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    return response
