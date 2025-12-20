@@ -1,0 +1,51 @@
+{
+  "counts": [
+    {
+      "timestamp": 0,
+      "count": 12
+    },
+    {
+      "timestamp": 1,
+      "count": 13
+    },
+    {
+      "timestamp": 2,
+      "count": 13
+    },
+    {
+      "timestamp": 3,
+      "count": 14
+    }
+  ],
+  "tracks_sample": [
+    {
+      "track_id": 1,
+      "bbox": [120, 85, 210, 165],
+      "confidence": 0.91
+    },
+    {
+      "track_id": 2,
+      "bbox": [300, 140, 380, 220],
+      "confidence": 0.88
+    }
+  ],
+  "weight_estimates": {
+    "type": "relative_weight_index",
+    "unit": "index",
+    "per_bird": [
+      {
+        "track_id": 1,
+        "weight_index": 1.18
+      },
+      {
+        "track_id": 2,
+        "weight_index": 1.25
+      }
+    ],
+    "aggregate_mean": 1.21,
+    "confidence": 0.76
+  },
+  "artifacts": {
+    "annotated_video": "outputs/annotated_video.mp4"
+  }
+}
