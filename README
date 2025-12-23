@@ -1,15 +1,41 @@
-# Poultry Monitoring Prototype
+# Bird Counting and Weight Estimation
 
-## Setup
+This project implements a FastAPI service for detecting, tracking, and counting birds in videos, along with estimating their total weight. It uses computer vision techniques to process uploaded videos and return results via a REST API.
 
-1. Install requirements: `pip install -r requirements.txt`
-2. Run server: `python main.py`
+## Approach
 
-## Counting & Weight Method
+### Overview
+- **Bird Detection**: Uses YOLOv8 (a pre-trained object detection model from Ultralytics) to detect birds in each frame of the video. YOLOv8 is efficient and accurate for real-time detection.
+- **Tracking**: Employs the SORT (Simple Online and Realtime Tracking) algorithm to assign unique IDs to birds across frames, ensuring we count distinct birds rather than multiple detections of the same bird.
+- **Counting**: Tracks unique bird IDs throughout the video and counts them.
+- **Weight Estimation**: Assumes an average weight of 0.025 kg (25 grams) per bird (based on common small birds like sparrows; this is a simplification). Total weight is calculated as `count * average_weight`. In a real-world scenario, this could be improved with species classification (e.g., using a fine-tuned model) and size-based estimation.
+- **Video Annotation**: Generates an annotated output video with bounding boxes, confidence scores, and tracking IDs overlaid on the frames.
+- **API**: A single endpoint (`/process`) accepts video uploads, processes them asynchronously, and returns JSON results. The annotated video is saved locally (in production, it could be uploaded to cloud storage or streamed).
 
-- **Counting:** YOLOv8 detects birds; ByteTrack assigns persistent IDs and handles occlusions via Kalman filtering.
-- **Weight:** Calculated as 'Projected Dorsal Area' (Pixel Area). Grams require a reference object calibration (e.g., $Weight = Area * k$).
+### Constraints and Assumptions
+- Videos must be in MP4 format (other formats can be added with minor changes).
+- Assumes birds are the primary objects of interest; the model filters for the "bird" class.
+- Weight estimation is basic and not species-specific (e.g., no differentiation between sparrows and eagles). For accuracy, integrate a classification model.
+- Processing is CPU-based; for large videos, use GPU acceleration.
+- No handling for very long videos (e.g., >10 minutes) to avoid timeouts; in production, add chunking or background processing.
+- Ethical note: This system is for wildlife monitoring; ensure compliance with privacy and animal welfare laws.
 
-## API Usage
+### Setup and Installation
+1. Clone or download the code.
+2. Install dependencies: `pip install fastapi uvicorn opencv-python numpy torch torchvision ultralytics filterpy`.
+3. Run the server: `uvicorn app:app --reload`.
+4. The API will be available at `http://127.0.0.1:8000`.
 
-`POST /analyze_video` with a video file.
+### Usage
+- **API Endpoint**: POST to `/process` with a video file (multipart/form-data, key: "file").
+- **Example Request** curl -X POST "http://127.0.0.1:8000/process" -F "file=@sample_video.mp4"
+
+- **Response**: JSON with count and estimated weight. The annotated video is saved as `annotated_output.mp4` in the current directory.
+- **Annotated Video**: Shows bounding boxes (green for birds), confidence scores, and tracking IDs (e.g., "ID: 1").
+
+### Limitations and Improvements
+- Detection accuracy depends on video quality (e.g., lighting, angle).
+- Tracking may fail with occlusions or fast movements.
+- Weight estimation is placeholder; integrate a regression model trained on bird images with known weights/sizes.
+- Add authentication, rate limiting, and cloud storage for production.
+
